@@ -10,19 +10,35 @@ import type { SfTab, SfObject } from "@/lib/types";
 export default function TabsPage() {
   const [tabs, setTabs] = useState<SfTab[]>([]);
   const [objects, setObjects] = useState<SfObject[]>([]);
+  const [lwcs, setLwcs] = useState<{ id: string; name: string }[]>([]);
+  const [vfs, setVfs] = useState<{ id: string; name: string }[]>([]);
   const [show, setShow] = useState(false);
   const [label, setLabel] = useState("");
+  const [tabType, setTabType] = useState<"object" | "lwc" | "vf">("object");
   const [objectId, setObjectId] = useState("");
+  const [targetId, setTargetId] = useState("");
   const toast = useToast();
 
-  async function reload() { setTabs(await getTabs()); setObjects(await getObjects()); }
+  async function reload() {
+    setTabs(await getTabs());
+    setObjects(await getObjects());
+    const { data: l } = await supabase.from("sf_lwc_components").select("id,name").order("name");
+    const { data: v } = await supabase.from("sf_vf_pages").select("id,name").order("name");
+    setLwcs((l as any[]) || []); setVfs((v as any[]) || []);
+  }
   useEffect(() => { reload(); }, []);
 
   async function create() {
-    const obj = objects.find((o) => o.id === objectId);
-    if (!obj) return;
-    await supabase.from("sf_tabs").insert({ label: label || obj.plural_label, type: "object", object_id: objectId, icon: obj.icon });
-    setShow(false); setLabel(""); setObjectId("");
+    if (tabType === "object") {
+      const obj = objects.find((o) => o.id === objectId);
+      if (!obj) return;
+      await supabase.from("sf_tabs").insert({ label: label || obj.plural_label, type: "object", object_id: objectId, icon: obj.icon });
+    } else {
+      if (!targetId) return;
+      const name = (tabType === "lwc" ? lwcs : vfs).find((x) => x.id === targetId)?.name || "Tab";
+      await supabase.from("sf_tabs").insert({ label: label || name, type: tabType, url: targetId, icon: "FileCode" });
+    }
+    setShow(false); setLabel(""); setObjectId(""); setTargetId("");
     toast("Tab created", "success");
     reload();
   }
@@ -47,7 +63,16 @@ export default function TabsPage() {
       </div>
       {show && (
         <Modal title="New Tab" onClose={() => setShow(false)} footer={<><button className="btn" onClick={() => setShow(false)}>Cancel</button><button className="btn btn-brand" onClick={create}>Save</button></>}>
-          <div className="field mb"><label>Object</label><select value={objectId} onChange={(e) => setObjectId(e.target.value)}><option value="">--Select--</option>{objects.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}</select></div>
+          <div className="field mb"><label>Tab Type</label>
+            <select value={tabType} onChange={(e) => { setTabType(e.target.value as any); setTargetId(""); }}>
+              <option value="object">Object</option>
+              <option value="lwc">Lightning Component</option>
+              <option value="vf">Visualforce Page</option>
+            </select>
+          </div>
+          {tabType === "object" && <div className="field mb"><label>Object</label><select value={objectId} onChange={(e) => setObjectId(e.target.value)}><option value="">--Select--</option>{objects.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}</select></div>}
+          {tabType === "lwc" && <div className="field mb"><label>Component</label><select value={targetId} onChange={(e) => setTargetId(e.target.value)}><option value="">--Select--</option>{lwcs.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>}
+          {tabType === "vf" && <div className="field mb"><label>Page</label><select value={targetId} onChange={(e) => setTargetId(e.target.value)}><option value="">--Select--</option>{vfs.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>}
           <div className="field"><label>Tab Label (optional)</label><input value={label} onChange={(e) => setLabel(e.target.value)} /></div>
         </Modal>
       )}

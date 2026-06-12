@@ -148,7 +148,7 @@ export interface SfLightningPage {
 export interface SfTab {
   id: string;
   label: string;
-  type: "object" | "lightning_page" | "vf_page" | "web";
+  type: "object" | "lightning_page" | "vf_page" | "vf" | "lwc" | "web";
   object_id: string | null;
   lightning_page_id: string | null;
   url: string | null;

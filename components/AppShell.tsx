@@ -52,6 +52,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       return o ? `/o/${o.api_name}` : "#";
     }
     if (t.type === "lightning_page" && t.lightning_page_id) return `/page/${t.lightning_page_id}`;
+    if (t.type === "lwc" && t.url) return `/lc/${t.url}`;
+    if ((t.type === "vf" || t.type === "vf_page") && t.url) return `/vp/${t.url}`;
     if (t.type === "web" && t.url) return t.url;
     return "#";
   }

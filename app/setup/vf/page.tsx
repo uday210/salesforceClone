@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Icon } from "@/lib/icons";
 import { useToast } from "@/components/Toast";
+import { renderVf } from "@/lib/vf";
 import type { SfVfPage } from "@/lib/types";
 
 const SAMPLE = `<apex:page>
@@ -13,19 +14,6 @@ const SAMPLE = `<apex:page>
     </apex:pageBlockSection>
   </apex:pageBlock>
 </apex:page>`;
-
-// Very small VF-style markup -> HTML transformer (demonstration only)
-function renderVf(markup: string): string {
-  return markup
-    .replace(/<apex:page[^>]*>/gi, '<div class="vf-page">')
-    .replace(/<\/apex:page>/gi, "</div>")
-    .replace(/<apex:pageBlock(?:\s+title="([^"]*)")?[^>]*>/gi, (_m, t) => `<div class="card"><div class="card-header"><h3>${t || "Page Block"}</h3></div><div class="card-body">`)
-    .replace(/<\/apex:pageBlock>/gi, "</div></div>")
-    .replace(/<apex:pageBlockSection[^>]*>/gi, '<div class="vf-section">')
-    .replace(/<\/apex:pageBlockSection>/gi, "</div>")
-    .replace(/\{!\$User\.Name\}/gi, "Current User")
-    .replace(/\{![^}]*\}/g, "<em>(merge field)</em>");
-}
 
 export default function VfPage() {
   const [pages, setPages] = useState<SfVfPage[]>([]);
