@@ -87,17 +87,23 @@ export default function FlowRunner() {
         <div className="card">
           <div className="card-header"><h3>{screen.props.headline || screen.label || "Screen"}</h3></div>
           <div className="card-body">
-            {(screen.props.fields || []).length === 0 && <p className="muted">This screen has no input fields. Click Next.</p>}
-            {(screen.props.fields || []).map((fld: any, i: number) => (
-              <div key={i} className="field mb">
-                <label>{fld.label || fld.variable}</label>
-                {fld.type === "checkbox" ? (
-                  <input type="checkbox" style={{ width: "auto" }} checked={!!screenValues[fld.variable]} onChange={(e) => setScreenValues((v) => ({ ...v, [fld.variable]: e.target.checked }))} />
-                ) : (
-                  <input type={fld.type === "number" ? "number" : fld.type === "date" ? "date" : "text"} value={screenValues[fld.variable] ?? ""} onChange={(e) => setScreenValues((v) => ({ ...v, [fld.variable]: e.target.value }))} />
-                )}
-              </div>
-            ))}
+            {(() => {
+              const comps = screen.props.components || screen.props.fields || [];
+              if (comps.length === 0) return <p className="muted">This screen has no components. Click Next.</p>;
+              return comps.map((c: any, i: number) => {
+                if (c.type === "display") return <p key={i} className="mb">{c.text}</p>;
+                return (
+                  <div key={i} className="field mb">
+                    <label>{c.label || c.variable}</label>
+                    {c.type === "checkbox" ? (
+                      <input type="checkbox" style={{ width: "auto" }} checked={!!screenValues[c.variable]} onChange={(e) => setScreenValues((v) => ({ ...v, [c.variable]: e.target.checked }))} />
+                    ) : (
+                      <input type={c.type === "number" ? "number" : c.type === "date" ? "date" : "text"} value={screenValues[c.variable] ?? ""} onChange={(e) => setScreenValues((v) => ({ ...v, [c.variable]: e.target.value }))} />
+                    )}
+                  </div>
+                );
+              });
+            })()}
             <div className="flex" style={{ justifyContent: "flex-end" }}>
               <button className="btn btn-brand" onClick={submitScreen}>Next <Icon name="ChevronRight" size={14} className="" /></button>
             </div>

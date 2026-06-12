@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { getObjects, getFields } from "@/lib/metadata";
 import { Icon } from "@/lib/icons";
 import { useToast } from "@/components/Toast";
+import VerticalFlowBuilder from "@/components/VerticalFlowBuilder";
 import type { SfFlow, SfObject, SfField, FlowNode } from "@/lib/types";
 // objects loaded for Get Records configuration
 
@@ -79,6 +80,15 @@ export default function FlowBuilder() {
   if (!flow) return <div className="spinner" />;
   const sel = nodes.find((n) => n.id === selId) || null;
 
+  const isVertical = flow.type === "screen" || flow.type === "autolaunched";
+  const startNode = nodes.find((n) => n.type === "start") || nodes[0];
+  function orderedElements(): FlowNode[] {
+    if (!startNode) return [];
+    const out: FlowNode[] = []; const seen = new Set<string>(); let cur = startNode;
+    while (cur) { const e = edges.find((x) => x.from === cur.id); if (!e) break; const nx = nodes.find((n) => n.id === e.to); if (!nx || seen.has(nx.id)) break; seen.add(nx.id); out.push(nx); cur = nx; }
+    return out.length ? out : nodes.filter((n) => n.type !== "start");
+  }
+
   return (
     <div>
       <div className="flex items-center gap mb">
@@ -90,6 +100,15 @@ export default function FlowBuilder() {
         <button className={`btn btn-brand ${flow.type === "record_triggered" || flow.type === "scheduled" ? "ml-auto" : ""}`} onClick={save}><Icon name="Save" size={14} /> Save</button>
       </div>
 
+      {isVertical ? (
+        <VerticalFlowBuilder
+          start={startNode}
+          initialElements={orderedElements()}
+          objects={objects}
+          onChange={(newNodes, newEdges) => { setNodes(newNodes); setEdges(newEdges); }}
+        />
+      ) : (
+      <>
       <div className="flex gap mb" style={{ flexWrap: "wrap" }}>
         {NODE_TYPES.map((t) => (
           <button key={t.type} className="btn btn-sm" onClick={() => addNode(t.type)}><Icon name={t.icon} size={13} /> {t.label}</button>
@@ -144,6 +163,8 @@ export default function FlowBuilder() {
         </div>
       </div>
       <p className="muted mt" style={{ fontSize: "0.78rem" }}>Drag nodes to reposition. Use the connect fields to link elements. Active flows run on “{flow.trigger_event}” of the trigger object.</p>
+      </>
+      )}
     </div>
   );
 }
