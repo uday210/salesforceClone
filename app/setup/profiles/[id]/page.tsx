@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { getObjects } from "@/lib/metadata";
 import { Icon } from "@/lib/icons";
 import { useToast } from "@/components/Toast";
+import FieldLevelSecurity from "@/components/FieldLevelSecurity";
 import type { SfProfile, SfObject, SfObjectPermission } from "@/lib/types";
 
 const PERMS: { key: keyof SfObjectPermission; label: string }[] = [
@@ -92,6 +93,12 @@ export default function ProfileDetailPage() {
           </table>
         </div>
       </div>
+
+      {!profile.is_admin && (
+        <div className="mt">
+          <FieldLevelSecurity profileId={id} />
+        </div>
+      )}
     </div>
   );
 }

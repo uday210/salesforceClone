@@ -84,6 +84,30 @@ export async function isAdmin(): Promise<boolean> {
   return !!u?.profile?.is_admin;
 }
 
+// Field-level security: which fields are hidden / read-only for the current user.
+// Default is visible+editable unless a field permission explicitly restricts it.
+export async function getFieldAccess(objectId: string): Promise<{ hidden: Set<string>; readOnly: Set<string> }> {
+  const empty = { hidden: new Set<string>(), readOnly: new Set<string>() };
+  const user = await getCurrentUser();
+  if (!user || user.profile?.is_admin) return empty;
+
+  const sources: string[] = [];
+  if (user.assignment?.profile_id) sources.push(user.assignment.profile_id);
+  const permSetIds = user.assignment?.permission_set_ids || [];
+
+  const { data: flds } = await supabase.from("sf_fields").select("id").eq("object_id", objectId);
+  const fieldIds = ((flds as any[]) || []).map((f) => f.id);
+  if (!fieldIds.length) return empty;
+
+  const { data: fp } = await supabase.from("sf_field_permissions").select("*").in("field_id", fieldIds);
+  const relevant = ((fp as any[]) || []).filter(
+    (p) => (p.profile_id && sources.includes(p.profile_id)) || (p.permission_set_id && permSetIds.includes(p.permission_set_id))
+  );
+  const hidden = new Set<string>(relevant.filter((p) => !p.readable).map((p) => p.field_id));
+  const readOnly = new Set<string>(relevant.filter((p) => p.readable && !p.editable).map((p) => p.field_id));
+  return { hidden, readOnly };
+}
+
 export async function signOut() {
   clearUserCache();
   await supabase.auth.signOut();
