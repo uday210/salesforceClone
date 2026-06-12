@@ -83,8 +83,11 @@ export default function FlowBuilder() {
     <div>
       <div className="flex items-center gap mb">
         <span className="record-icon" style={{ background: flow.active ? "var(--sf-green)" : "var(--sf-blue)" }}><Icon name="Workflow" size={18} /></span>
-        <div><div className="eyebrow muted">Record-Triggered Flow · {flow.trigger_event}</div><h1>{flow.label}</h1></div>
-        <button className="btn btn-brand ml-auto" onClick={save}><Icon name="Save" size={14} /> Save</button>
+        <div><div className="eyebrow muted">{flow.type === "record_triggered" ? `Record-Triggered · ${flow.trigger_event}` : flow.type === "screen" ? "Screen Flow" : flow.type === "scheduled" ? "Scheduled Flow" : "Autolaunched Flow"}</div><h1>{flow.label}</h1></div>
+        {(flow.type === "screen" || flow.type === "autolaunched") && (
+          <a href={`/flow/${id}/run`} target="_blank" className="btn ml-auto"><Icon name="Play" size={14} /> Run</a>
+        )}
+        <button className={`btn btn-brand ${flow.type === "record_triggered" || flow.type === "scheduled" ? "ml-auto" : ""}`} onClick={save}><Icon name="Save" size={14} /> Save</button>
       </div>
 
       <div className="flex gap mb" style={{ flexWrap: "wrap" }}>
@@ -185,8 +188,9 @@ function NodeProps({ node, nodes, fields, objects, edges, onChange, onLabelChang
 
       {node.type === "screen" && (
         <>
-          <p className="muted mb" style={{ fontSize: "0.78rem" }}>Screen elements collect input in interactive (screen) flows. In record-triggered flows they're skipped.</p>
-          <div className="field"><label>Next → go to</label><select value={edgeTo("next")} onChange={(e) => onConnect(node.id, e.target.value, "next")}><option value="">--</option>{others.map((n) => <option key={n.id} value={n.id}>{n.label || n.type}</option>)}</select></div>
+          <div className="field mb"><label>Headline</label><input value={p.headline || ""} onChange={(e) => set("headline", e.target.value)} placeholder="Screen title" /></div>
+          <ScreenFieldsEditor value={p.fields || []} onChange={(f) => set("fields", f)} />
+          <div className="field mt"><label>Next → go to</label><select value={edgeTo("next")} onChange={(e) => onConnect(node.id, e.target.value, "next")}><option value="">--</option>{others.map((n) => <option key={n.id} value={n.id}>{n.label || n.type}</option>)}</select></div>
         </>
       )}
 
@@ -224,6 +228,25 @@ function NodeProps({ node, nodes, fields, objects, edges, onChange, onLabelChang
 function buildCond(p: Record<string, any>) {
   if (["blank", "notblank"].includes(p.op)) return { op: p.op, field: p.field };
   return { op: p.op || "eq", field: p.field, value: isNaN(Number(p.value)) ? p.value : Number(p.value) };
+}
+
+function ScreenFieldsEditor({ value, onChange }: { value: { label: string; variable: string; type: string }[]; onChange: (f: any[]) => void }) {
+  return (
+    <div>
+      <label>Screen Input Fields</label>
+      {value.map((f, i) => (
+        <div key={i} className="flex gap-sm mb" style={{ marginTop: 4, alignItems: "center" }}>
+          <input placeholder="Label" value={f.label} onChange={(e) => onChange(value.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} />
+          <input placeholder="variable" value={f.variable} onChange={(e) => onChange(value.map((x, j) => (j === i ? { ...x, variable: e.target.value } : x)))} />
+          <select value={f.type} style={{ width: 110 }} onChange={(e) => onChange(value.map((x, j) => (j === i ? { ...x, type: e.target.value } : x)))}>
+            {["text", "number", "checkbox", "date"].map((t) => <option key={t}>{t}</option>)}
+          </select>
+          <button className="btn-icon btn-sm" onClick={() => onChange(value.filter((_, j) => j !== i))}><Icon name="X" size={12} /></button>
+        </div>
+      ))}
+      <button className="btn btn-sm mt" onClick={() => onChange([...value, { label: "", variable: "", type: "text" }])}><Icon name="Plus" size={12} /> Add Field</button>
+    </div>
+  );
 }
 
 function AssignmentEditor({ fields, value, onChange }: { fields: SfField[]; value: { field: string; value: any }[]; onChange: (a: any[]) => void }) {

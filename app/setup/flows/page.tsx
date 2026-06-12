@@ -16,6 +16,7 @@ export default function FlowsPage() {
   const [objects, setObjects] = useState<SfObject[]>([]);
   const [show, setShow] = useState(false);
   const [label, setLabel] = useState("");
+  const [flowType, setFlowType] = useState("record_triggered");
   const [objectId, setObjectId] = useState("");
   const [event, setEvent] = useState("after_create");
   const toast = useToast();
@@ -31,8 +32,9 @@ export default function FlowsPage() {
     if (!label) return;
     const start = { id: crypto.randomUUID(), type: "start", label: "Start", props: {}, x: 60, y: 60 };
     const { data } = await supabase.from("sf_flows").insert({
-      api_name: apiNameFromLabel(label), label, type: "record_triggered",
-      trigger_object_id: objectId || null, trigger_event: event,
+      api_name: apiNameFromLabel(label), label, type: flowType,
+      trigger_object_id: flowType === "record_triggered" ? (objectId || null) : null,
+      trigger_event: event,
       definition: { nodes: [start], edges: [] }, active: false,
     }).select().single();
     setShow(false); setLabel("");
@@ -69,11 +71,22 @@ export default function FlowsPage() {
         </table>
       </div>
       {show && (
-        <Modal title="New Record-Triggered Flow" onClose={() => setShow(false)} footer={<><button className="btn" onClick={() => setShow(false)}>Cancel</button><button className="btn btn-brand" onClick={create}>Create</button></>}>
+        <Modal title="New Flow" onClose={() => setShow(false)} footer={<><button className="btn" onClick={() => setShow(false)}>Cancel</button><button className="btn btn-brand" onClick={create}>Create</button></>}>
           <div className="form-grid">
             <div className="field field-full"><label>Flow Label *</label><input value={label} onChange={(e) => setLabel(e.target.value)} /></div>
-            <div className="field"><label>Object</label><select value={objectId} onChange={(e) => setObjectId(e.target.value)}><option value="">--Select--</option>{objects.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}</select></div>
-            <div className="field"><label>Trigger</label><select value={event} onChange={(e) => setEvent(e.target.value)}>{EVENTS.map((e) => <option key={e} value={e}>{e}</option>)}</select></div>
+            <div className="field field-full"><label>Flow Type</label>
+              <select value={flowType} onChange={(e) => setFlowType(e.target.value)}>
+                <option value="record_triggered">Record-Triggered Flow</option>
+                <option value="screen">Screen Flow</option>
+                <option value="autolaunched">Autolaunched Flow (No Trigger)</option>
+                <option value="scheduled">Scheduled Flow</option>
+              </select>
+            </div>
+            {flowType === "record_triggered" && <>
+              <div className="field"><label>Object</label><select value={objectId} onChange={(e) => setObjectId(e.target.value)}><option value="">--Select--</option>{objects.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}</select></div>
+              <div className="field"><label>Trigger</label><select value={event} onChange={(e) => setEvent(e.target.value)}>{EVENTS.map((e) => <option key={e} value={e}>{e}</option>)}</select></div>
+            </>}
+            {flowType === "screen" && <p className="muted field-full" style={{ fontSize: "0.8rem" }}>Screen flows collect input interactively. Add Screen elements in the builder, then click Run.</p>}
           </div>
         </Modal>
       )}
