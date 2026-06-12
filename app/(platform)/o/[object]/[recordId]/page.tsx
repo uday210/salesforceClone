@@ -87,6 +87,28 @@ export default function RecordDetailPage() {
     .filter((f) => ["currency", "picklist", "date", "lookup", "email", "phone"].includes(f.type))
     .slice(0, 4);
 
+  const systemInfo = (
+    <div className="card mb">
+      <div className="card-header"><Icon name="Eye" size={16} /><h3>System Information</h3></div>
+      <div className="card-body">
+        <div className="field mb">
+          <span className="field-display-label">Created By</span>
+          <span className="field-display-value">
+            {record.created_by ? (userNames[record.created_by] || "User") : "—"}
+            <span className="muted">, {new Date(record.created_at).toLocaleString()}</span>
+          </span>
+        </div>
+        <div className="field">
+          <span className="field-display-label">Last Modified By</span>
+          <span className="field-display-value">
+            {record.last_modified_by ? (userNames[record.last_modified_by] || "User") : "—"}
+            <span className="muted">, {new Date(record.updated_at).toLocaleString()}</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="page">
       <div className="record-header">
@@ -200,28 +222,12 @@ export default function RecordDetailPage() {
         </div>
 
         <div>
-          <div className="card mb">
-            <div className="card-header"><Icon name="Eye" size={16} /><h3>System Information</h3></div>
-            <div className="card-body">
-              <div className="field mb">
-                <span className="field-display-label">Created By</span>
-                <span className="field-display-value">
-                  {record.created_by ? (userNames[record.created_by] || "User") : "—"}
-                  <span className="muted">, {new Date(record.created_at).toLocaleString()}</span>
-                </span>
-              </div>
-              <div className="field">
-                <span className="field-display-label">Last Modified By</span>
-                <span className="field-display-value">
-                  {record.last_modified_by ? (userNames[record.last_modified_by] || "User") : "—"}
-                  <span className="muted">, {new Date(record.updated_at).toLocaleString()}</span>
-                </span>
-              </div>
-            </div>
-          </div>
+          {systemInfo}
         </div>
       </div>
       )}
+
+      {lightningPage && systemInfo}
     </div>
   );
 }
