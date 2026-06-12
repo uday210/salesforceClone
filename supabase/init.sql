@@ -1,0 +1,2 @@
+-- DEPRECATED: the original 3-table CRM schema has been superseded by the
+-- full metadata-engine platform schema. See `supabase/schema.sql`.
