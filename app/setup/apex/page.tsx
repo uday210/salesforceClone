@@ -7,14 +7,26 @@ import { useToast } from "@/components/Toast";
 import type { SfApexClass, SfObject } from "@/lib/types";
 
 const TRIGGER_EVENTS = ["before insert", "after insert", "before update", "after update", "after delete"];
-const SAMPLE_CLASS = `// Apex-style class (JavaScript substitute). Available API:
-//   System.debug(...)      query('SELECT ... FROM ...')      insert(obj, data)   update(id, data)
-const opps = await query("SELECT Name, Amount, StageName FROM Opportunity WHERE Amount > 50000 ORDER BY Amount DESC");
-System.debug('Open large opps: ' + opps.length);
-for (const o of opps) {
-  System.debug(o.Name + ' = $' + o.Amount + ' (' + o.StageName + ')');
-}
-return opps.length;`;
+const SAMPLE_CLASS = `// A reusable class with STATIC methods. Keep the body a pure class so other
+// classes and triggers can call it, e.g. AccountService.rate(acc).
+class AccountService {
+  static rate(acc) {
+    return Number(acc.AnnualRevenue) > 1000000 ? 'Hot' : 'Warm';
+  }
+  static async topAccounts() {
+    return await query("SELECT Name, AnnualRevenue FROM Account ORDER BY AnnualRevenue DESC LIMIT 5");
+  }
+}`;
+const SAMPLE_BATCH = `// Batchable pattern — runs in chunks like Database.executeBatch.
+await Database.executeBatch({
+  start: () => "SELECT Name, AnnualRevenue FROM Account",
+  execute: async (scope) => {
+    for (const acc of scope) {
+      System.debug('Processing ' + acc.Name);
+    }
+  },
+  finish: () => System.debug('Batch complete'),
+}, 50); // scope size`;
 const SAMPLE_TRIGGER = `// Trigger body — runs on the configured events.
 // Trigger.new / Trigger.old are arrays; Trigger.isInsert / isUpdate / isBefore / isAfter are booleans.
 for (const acc of Trigger.new) {
@@ -38,11 +50,11 @@ export default function ApexPage() {
   }
   useEffect(() => { reload(); }, []);
 
-  async function create(type: "class" | "trigger") {
-    const name = prompt(`New ${type} name:`);
+  async function create(type: "class" | "trigger", body?: string) {
+    const name = prompt(`New ${type === "trigger" ? "trigger" : "class"} name:`);
     if (!name) return;
     const { data } = await supabase.from("sf_apex_classes").insert({
-      name, type, body: type === "class" ? SAMPLE_CLASS : SAMPLE_TRIGGER, trigger_events: [], active: true,
+      name, type, body: body || (type === "class" ? SAMPLE_CLASS : SAMPLE_TRIGGER), trigger_events: [], active: true,
     }).select().single();
     await reload();
     setSel(data as SfApexClass);
@@ -78,6 +90,7 @@ export default function ApexPage() {
         <div className="flex gap">
           <button className="btn" onClick={() => create("class")}><Icon name="Plus" size={14} /> New Class</button>
           <button className="btn" onClick={() => create("trigger")}><Icon name="Plus" size={14} /> New Trigger</button>
+          <button className="btn" onClick={() => create("class", SAMPLE_BATCH)}><Icon name="Plus" size={14} /> New Batch</button>
         </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: "0.75rem", alignItems: "start" }}>

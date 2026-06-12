@@ -1,9 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/lib/icons";
 import { runSoql, type SoqlResult } from "@/lib/soql";
-import { runApex } from "@/lib/apexRuntime";
+import { runApex, saveDebugLog } from "@/lib/apexRuntime";
+import { supabase } from "@/lib/supabaseClient";
 
 const SAMPLE_SOQL = "SELECT Name, Type, Industry, AnnualRevenue FROM Account WHERE AnnualRevenue > 1000000 ORDER BY AnnualRevenue DESC LIMIT 10";
 const SAMPLE_APEX = `// Execute Anonymous — JavaScript with an Apex-flavored API.
@@ -12,14 +13,24 @@ System.debug('Total leads: ' + leads.length);
 const hot = leads.filter(l => l.Status === 'Qualified');
 System.debug('Qualified: ' + hot.length);`;
 
+interface DebugLog { id: string; source: string; kind: string; status: string; logs: string[]; created_at: string; }
+
 export default function DevConsole() {
-  const [tab, setTab] = useState<"query" | "anon">("query");
+  const [tab, setTab] = useState<"query" | "anon" | "logs">("query");
   const [soql, setSoql] = useState(SAMPLE_SOQL);
   const [result, setResult] = useState<SoqlResult | null>(null);
   const [queryError, setQueryError] = useState("");
   const [running, setRunning] = useState(false);
   const [apex, setApex] = useState(SAMPLE_APEX);
   const [logs, setLogs] = useState<string[]>([]);
+  const [debugLogs, setDebugLogs] = useState<DebugLog[]>([]);
+  const [openLog, setOpenLog] = useState<string | null>(null);
+
+  async function loadDebugLogs() {
+    const { data } = await supabase.from("sf_debug_logs").select("*").order("created_at", { ascending: false }).limit(50);
+    setDebugLogs((data as DebugLog[]) || []);
+  }
+  useEffect(() => { if (tab === "logs") loadDebugLogs(); }, [tab]);
 
   async function execQuery() {
     setRunning(true); setQueryError(""); setResult(null);
@@ -31,6 +42,7 @@ export default function DevConsole() {
     setRunning(true); setLogs(["Running…"]);
     const res = await runApex(apex);
     setLogs(res.logs.length ? res.logs : ["(no output)"]);
+    await saveDebugLog({ source: "Execute Anonymous", kind: "anonymous", logs: res.logs, status: res.error ? "error" : "success" });
     setRunning(false);
   }
 
@@ -45,6 +57,7 @@ export default function DevConsole() {
       <div className="nav-bar" style={{ background: "#fff", boxShadow: "none", border: "1px solid var(--sf-border)", borderBottom: "none", borderRadius: "0.5rem 0.5rem 0 0" }}>
         <a className={`nav-tab ${tab === "query" ? "active" : ""}`} style={{ color: tab === "query" ? "var(--sf-blue)" : "var(--sf-text-weak)", borderBottomColor: tab === "query" ? "var(--sf-blue)" : "transparent", cursor: "pointer" }} onClick={() => setTab("query")}>Query Editor</a>
         <a className={`nav-tab ${tab === "anon" ? "active" : ""}`} style={{ color: tab === "anon" ? "var(--sf-blue)" : "var(--sf-text-weak)", borderBottomColor: tab === "anon" ? "var(--sf-blue)" : "transparent", cursor: "pointer" }} onClick={() => setTab("anon")}>Execute Anonymous</a>
+        <a className={`nav-tab ${tab === "logs" ? "active" : ""}`} style={{ color: tab === "logs" ? "var(--sf-blue)" : "var(--sf-text-weak)", borderBottomColor: tab === "logs" ? "var(--sf-blue)" : "transparent", cursor: "pointer" }} onClick={() => setTab("logs")}>Logs</a>
       </div>
 
       <div className="card" style={{ borderRadius: "0 0 0.5rem 0.5rem" }}>
@@ -71,7 +84,7 @@ export default function DevConsole() {
                 </div>
               )}
             </>
-          ) : (
+          ) : tab === "anon" ? (
             <>
               <textarea className="code-editor" value={apex} onChange={(e) => setApex(e.target.value)} />
               <div className="flex gap mt mb">
@@ -83,6 +96,44 @@ export default function DevConsole() {
                   const color = l.startsWith("FATAL") ? "#f38ba8" : l.startsWith("DML") ? "#a6e3a1" : l.startsWith("RESULT") ? "#f9e2af" : "#cdd6f4";
                   return <div key={i} style={{ color }}>{l}</div>;
                 }) : <span className="muted">Run code to see logs.</span>}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center mb" style={{ justifyContent: "space-between" }}>
+                <span className="muted">Most recent 50 executions (triggers, flows, anonymous, batch).</span>
+                <button className="btn btn-sm" onClick={loadDebugLogs}><Icon name="Loader2" size={12} /> Refresh</button>
+              </div>
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead><tr><th></th><th>Source</th><th>Kind</th><th>Status</th><th>Time</th></tr></thead>
+                  <tbody>
+                    {debugLogs.map((dl) => (
+                      <>
+                        <tr key={dl.id} style={{ cursor: "pointer" }} onClick={() => setOpenLog(openLog === dl.id ? null : dl.id)}>
+                          <td><Icon name={openLog === dl.id ? "ChevronDown" : "ChevronRight"} size={13} /></td>
+                          <td>{dl.source}</td>
+                          <td><span className="badge">{dl.kind}</span></td>
+                          <td>{dl.status === "error" ? <span className="badge" style={{ color: "var(--sf-red)" }}>error</span> : <span className="badge" style={{ color: "var(--sf-green)" }}>success</span>}</td>
+                          <td className="muted">{new Date(dl.created_at).toLocaleString()}</td>
+                        </tr>
+                        {openLog === dl.id && (
+                          <tr key={dl.id + "-log"}>
+                            <td colSpan={5} style={{ padding: 0 }}>
+                              <div style={{ background: "#1e1e2e", color: "#cdd6f4", padding: "0.75rem 1rem", fontFamily: "monospace", fontSize: "0.76rem" }}>
+                                {(dl.logs || []).length ? dl.logs.map((l, i) => {
+                                  const color = l.startsWith("FATAL") ? "#f38ba8" : l.startsWith("DML") || l.startsWith("BATCH") ? "#a6e3a1" : l.startsWith("RESULT") ? "#f9e2af" : "#cdd6f4";
+                                  return <div key={i} style={{ color }}>{l}</div>;
+                                }) : <span className="muted">No debug output.</span>}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </>
+                    ))}
+                    {!debugLogs.length && <tr><td colSpan={5} className="muted">No logs yet. Run a trigger (create/edit a record) or Execute Anonymous, then refresh.</td></tr>}
+                  </tbody>
+                </table>
               </div>
             </>
           )}

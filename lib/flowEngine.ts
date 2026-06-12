@@ -46,11 +46,16 @@ export async function runAutomation(
     const events = (trg.trigger_events || []).map((e) => e.toLowerCase());
     if (!events.some((e) => e.includes(event.split("_")[0]) || e === apexEvent)) continue;
     try {
-      const { runApex } = await import("./apexRuntime");
+      const { runApex, saveDebugLog } = await import("./apexRuntime");
       const res = await runApex(trg.body, { trigger: { newRecords: [record.data], event: apexEvent } });
       res.logs.forEach((l) => log.push({ source: trg.name, message: l }));
       // persist any in-place mutations the trigger made to record.data
       await supabase.from("sf_records").update({ data: record.data }).eq("id", record.id);
+      // capture the debug log so it shows in the Developer Console → Logs
+      await saveDebugLog({
+        source: trg.name, kind: "trigger", logs: res.logs,
+        status: res.error ? "error" : "success", recordId: record.id,
+      });
     } catch (e: any) {
       log.push({ source: trg.name, message: `Apex error: ${e.message}` });
     }
