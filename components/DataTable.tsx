@@ -42,7 +42,7 @@ export default function DataTable({
                         : <FieldDisplay field={f} value={r.data[f.api_name]} />}
                     </Link>
                   ) : (
-                    <FieldDisplay field={f} value={r.data[f.api_name]} />
+                    <FieldDisplay field={f} value={r.data[f.api_name]} data={r.data} />
                   )}
                 </td>
               ))}

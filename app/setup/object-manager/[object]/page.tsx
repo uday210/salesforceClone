@@ -10,7 +10,7 @@ import Modal from "@/components/Modal";
 import { useToast } from "@/components/Toast";
 import type { SfObject, SfField, SfValidationRule, SfRecordType, FieldType } from "@/lib/types";
 
-const FIELD_TYPES: FieldType[] = ["text", "textarea", "number", "currency", "percent", "checkbox", "date", "datetime", "email", "phone", "url", "picklist", "lookup"];
+const FIELD_TYPES: FieldType[] = ["text", "textarea", "number", "currency", "percent", "checkbox", "date", "datetime", "email", "phone", "url", "picklist", "lookup", "formula"];
 const OPS = ["eq", "ne", "lt", "lte", "gt", "gte", "contains", "blank", "notblank", "in"];
 
 export default function ObjectDetailPage() {
@@ -138,6 +138,7 @@ function NewFieldModal({ object, allObjects, order, onClose, onSaved }: { object
   const [required, setRequired] = useState(false);
   const [picklist, setPicklist] = useState("");
   const [refObj, setRefObj] = useState("");
+  const [formula, setFormula] = useState("");
   const [saving, setSaving] = useState(false);
   const apiName = label ? `${apiNameFromLabel(label)}__c` : "";
 
@@ -148,8 +149,9 @@ function NewFieldModal({ object, allObjects, order, onClose, onSaved }: { object
       ? picklist.split("\n").map((s) => s.trim()).filter(Boolean).map((v) => ({ value: v, label: v }))
       : [];
     const { error } = await supabase.from("sf_fields").insert({
-      object_id: object.id, api_name: apiName, label, type, required, is_custom: true, display_order: order,
+      object_id: object.id, api_name: apiName, label, type, required: type === "formula" ? false : required, is_custom: true, display_order: order,
       picklist_values: picklistValues, reference_object_id: type === "lookup" ? refObj || null : null,
+      formula: type === "formula" ? formula : null,
     });
     setSaving(false);
     if (error) { alert(error.message); return; }
@@ -183,57 +185,79 @@ function NewFieldModal({ object, allObjects, order, onClose, onSaved }: { object
             </select>
           </div>
         )}
+        {type === "formula" && (
+          <div className="field field-full">
+            <label>Formula</label>
+            <textarea value={formula} onChange={(e) => setFormula(e.target.value)} placeholder='e.g. IF(Amount > 100000, "Large", "Standard")  ·  Amount * 0.1  ·  FirstName & " " & LastName' />
+            <span className="muted" style={{ fontSize: "0.72rem" }}>Reference fields by API name. Functions: IF, AND, OR, NOT, TEXT, ROUND, MAX, MIN, LEN, UPPER, LOWER, LEFT, RIGHT, CONTAINS, ISBLANK, TODAY. Use &amp; to join text.</span>
+          </div>
+        )}
       </div>
     </Modal>
   );
 }
 
+interface CondRow { field: string; op: string; value: string; }
+
 function NewRuleModal({ object, fields, onClose, onSaved }: { object: SfObject; fields: SfField[]; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState("");
-  const [field, setField] = useState(fields[0]?.api_name || "");
-  const [op, setOp] = useState("eq");
-  const [value, setValue] = useState("");
+  const [logic, setLogic] = useState<"and" | "or">("and");
+  const [rows, setRows] = useState<CondRow[]>([{ field: fields[0]?.api_name || "", op: "eq", value: "" }]);
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
 
+  function buildCond(r: CondRow): any {
+    if (["blank", "notblank"].includes(r.op)) return { op: r.op, field: r.field };
+    if (r.op === "in") return { op: r.op, field: r.field, value: r.value.split(",").map((s) => s.trim()) };
+    return { op: r.op, field: r.field, value: isNaN(Number(r.value)) ? r.value : Number(r.value) };
+  }
+
   async function save() {
-    if (!name || !message) return;
+    if (!name || !message || !rows.length) return;
     setSaving(true);
-    const needsValue = !["blank", "notblank"].includes(op);
-    const condition: any = needsValue
-      ? (op === "in" ? { op, field, value: value.split(",").map((s) => s.trim()) } : { op, field, value: isNaN(Number(value)) ? value : Number(value) })
-      : { op, field };
+    const condition = rows.length === 1 ? buildCond(rows[0]) : { op: logic, args: rows.map(buildCond) };
     const { error } = await supabase.from("sf_validation_rules").insert({
-      object_id: object.id, name: apiNameFromLabel(name), condition, error_message: message, error_location: field, active: true,
+      object_id: object.id, name: apiNameFromLabel(name), condition, error_message: message, error_location: rows[0].field, active: true,
     });
     setSaving(false);
     if (error) { alert(error.message); return; }
     onSaved();
   }
 
+  function update(i: number, patch: Partial<CondRow>) {
+    setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  }
+
   return (
-    <Modal title="New Validation Rule" onClose={onClose} footer={
+    <Modal title="New Validation Rule" onClose={onClose} wide footer={
       <>
         <button className="btn" onClick={onClose}>Cancel</button>
         <button className="btn btn-brand" onClick={save} disabled={saving}>Save</button>
       </>
     }>
-      <p className="muted mb">The error fires when the condition evaluates to <strong>true</strong>.</p>
-      <div className="form-grid">
-        <div className="field field-full"><label>Rule Name *</label><input value={name} onChange={(e) => setName(e.target.value)} /></div>
-        <div className="field"><label>Field</label>
-          <select value={field} onChange={(e) => setField(e.target.value)}>
-            {fields.map((f) => <option key={f.id} value={f.api_name}>{f.label}</option>)}
+      <p className="muted mb">The error fires when the formula evaluates to <strong>true</strong>.</p>
+      <div className="form-grid mb">
+        <div className="field"><label>Rule Name *</label><input value={name} onChange={(e) => setName(e.target.value)} /></div>
+        <div className="field"><label>Combine conditions with</label>
+          <select value={logic} onChange={(e) => setLogic(e.target.value as any)} disabled={rows.length < 2}>
+            <option value="and">ALL (AND)</option><option value="or">ANY (OR)</option>
           </select>
         </div>
-        <div className="field"><label>Operator</label>
-          <select value={op} onChange={(e) => setOp(e.target.value)}>{OPS.map((o) => <option key={o} value={o}>{o}</option>)}</select>
-        </div>
-        {!["blank", "notblank"].includes(op) && (
-          <div className="field field-full"><label>Value {op === "in" ? "(comma-separated)" : ""}</label><input value={value} onChange={(e) => setValue(e.target.value)} /></div>
-        )}
-        <div className="field field-full"><label>Error Message *</label><input value={message} onChange={(e) => setMessage(e.target.value)} /></div>
       </div>
+      <label>Conditions</label>
+      {rows.map((r, i) => (
+        <div key={i} className="flex gap-sm mb" style={{ marginTop: 4, alignItems: "center" }}>
+          {i > 0 && <span className="badge" style={{ minWidth: 42, justifyContent: "center" }}>{logic.toUpperCase()}</span>}
+          <select value={r.field} onChange={(e) => update(i, { field: e.target.value })}>
+            {fields.map((f) => <option key={f.id} value={f.api_name}>{f.label}</option>)}
+          </select>
+          <select value={r.op} onChange={(e) => update(i, { op: e.target.value })} style={{ width: 130 }}>{OPS.map((o) => <option key={o} value={o}>{o}</option>)}</select>
+          {!["blank", "notblank"].includes(r.op) && <input placeholder="value" value={r.value} onChange={(e) => update(i, { value: e.target.value })} />}
+          <button className="btn-icon btn-sm" onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))} disabled={rows.length === 1}><Icon name="X" size={12} /></button>
+        </div>
+      ))}
+      <button className="btn btn-sm mt mb" onClick={() => setRows((rs) => [...rs, { field: fields[0]?.api_name || "", op: "eq", value: "" }])}><Icon name="Plus" size={12} /> Add Condition</button>
+      <div className="field"><label>Error Message *</label><input value={message} onChange={(e) => setMessage(e.target.value)} /></div>
     </Modal>
   );
 }

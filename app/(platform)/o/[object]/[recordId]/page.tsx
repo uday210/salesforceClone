@@ -122,7 +122,7 @@ export default function RecordDetailPage() {
                 {fields.map((f) => (
                   <div key={f.id} className="field">
                     <span className="field-display-label">{f.label}</span>
-                    <FieldDisplay field={f} value={record.data[f.api_name]} />
+                    <FieldDisplay field={f} value={record.data[f.api_name]} data={record.data} />
                   </div>
                 ))}
               </div>

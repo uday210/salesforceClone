@@ -320,5 +320,17 @@ label { font-size: 0.75rem; color: var(--sf-text-weak); font-weight: 600; }
 .flow-node.decision { border-top: 3px solid var(--sf-orange); }
 .flow-node.action, .flow-node.create, .flow-node.update { border-top: 3px solid var(--sf-blue); }
 
+/* ---------- Lookup search ---------- */
+.lookup-search { position: relative; }
+.lookup-search-icon { position: absolute; left: 0.6rem; top: 50%; transform: translateY(-50%); color: var(--sf-text-weak); pointer-events: none; }
+.lookup-search input { padding-left: 2rem; }
+.lookup-results { position: absolute; top: calc(100% + 2px); left: 0; right: 0; background: #fff; border: 1px solid var(--sf-border-strong); border-radius: var(--radius); box-shadow: var(--shadow-lg); z-index: 40; max-height: 240px; overflow-y: auto; }
+.lookup-result { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.7rem; font-size: 0.82rem; cursor: pointer; }
+.lookup-result:hover { background: var(--sf-blue-light); }
+.lookup-pill { display: flex; align-items: center; gap: 0.5rem; height: 32px; padding: 0 0.4rem 0 0.6rem; border: 1px solid var(--sf-border-strong); border-radius: var(--radius); background: #fff; }
+.lookup-pill-icon { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 4px; background: var(--sf-blue); color: #fff; flex-shrink: 0; }
+.lookup-clear { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border: none; background: transparent; color: var(--sf-text-weak); border-radius: 4px; }
+.lookup-clear:hover { background: #f0f0f0; }
+
 /* ---------- Code editor ---------- */
 .code-editor { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 0.8rem; min-height: 360px; background: #1e1e2e; color: #cdd6f4; border-color: #313244; }
