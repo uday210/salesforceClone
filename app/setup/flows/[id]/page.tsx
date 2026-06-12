@@ -6,11 +6,15 @@ import { getObjects, getFields } from "@/lib/metadata";
 import { Icon } from "@/lib/icons";
 import { useToast } from "@/components/Toast";
 import type { SfFlow, SfObject, SfField, FlowNode } from "@/lib/types";
+// objects loaded for Get Records configuration
 
 const NODE_TYPES: { type: FlowNode["type"]; label: string; icon: string }[] = [
   { type: "decision", label: "Decision", icon: "GitBranch" },
+  { type: "get_records", label: "Get Records", icon: "Database" },
+  { type: "loop", label: "Loop", icon: "Workflow" },
   { type: "assignment", label: "Assignment", icon: "Pencil" },
   { type: "update", label: "Update Record", icon: "Save" },
+  { type: "screen", label: "Screen", icon: "Layout" },
   { type: "action", label: "Action / Log", icon: "Zap" },
   { type: "end", label: "End", icon: "Check" },
 ];
@@ -20,6 +24,7 @@ export default function FlowBuilder() {
   const toast = useToast();
   const [flow, setFlow] = useState<SfFlow | null>(null);
   const [fields, setFields] = useState<SfField[]>([]);
+  const [objects, setObjects] = useState<SfObject[]>([]);
   const [nodes, setNodes] = useState<FlowNode[]>([]);
   const [edges, setEdges] = useState<{ from: string; to: string; label?: string }[]>([]);
   const [selId, setSelId] = useState<string | null>(null);
@@ -32,6 +37,7 @@ export default function FlowBuilder() {
       setFlow(f);
       setNodes(f.definition.nodes || []);
       setEdges(f.definition.edges || []);
+      setObjects(await getObjects());
       if (f.trigger_object_id) setFields(await getFields(f.trigger_object_id));
     })();
   }, [id]);
@@ -129,7 +135,7 @@ export default function FlowBuilder() {
           <div className="card-header"><h3>Element</h3></div>
           <div className="card-body">
             {!sel ? <p className="muted">Select an element to configure it.</p> : (
-              <NodeProps node={sel} nodes={nodes} fields={fields} edges={edges} onChange={setNodeProps} onLabelChange={setNodeLabel} onConnect={connect} />
+              <NodeProps node={sel} nodes={nodes} fields={fields} objects={objects} edges={edges} onChange={setNodeProps} onLabelChange={setNodeLabel} onConnect={connect} />
             )}
           </div>
         </div>
@@ -139,8 +145,8 @@ export default function FlowBuilder() {
   );
 }
 
-function NodeProps({ node, nodes, fields, edges, onChange, onLabelChange, onConnect }: {
-  node: FlowNode; nodes: FlowNode[]; fields: SfField[];
+function NodeProps({ node, nodes, fields, objects, edges, onChange, onLabelChange, onConnect }: {
+  node: FlowNode; nodes: FlowNode[]; fields: SfField[]; objects: SfObject[];
   edges: { from: string; to: string; label?: string }[];
   onChange: (p: Record<string, any>) => void;
   onLabelChange: (label: string) => void;
@@ -154,6 +160,35 @@ function NodeProps({ node, nodes, fields, edges, onChange, onLabelChange, onConn
   return (
     <div>
       <div className="field mb"><label>Label</label><input value={node.label || ""} onChange={(e) => onLabelChange(e.target.value)} placeholder={node.type} /></div>
+
+      {node.type === "get_records" && (
+        <>
+          <div className="field mb"><label>Object</label>
+            <select value={p.object_id || ""} onChange={(e) => set("object_id", e.target.value)}>
+              <option value="">--Select--</option>{objects.map((o) => <option key={o.id} value={o.id}>{o.plural_label}</option>)}
+            </select>
+          </div>
+          <div className="field mb"><label>Filter Field (optional)</label><input value={p.filterField || ""} onChange={(e) => set("filterField", e.target.value)} placeholder="e.g. StageName" /></div>
+          <div className="field mb"><label>Filter Equals</label><input value={p.filterValue || ""} onChange={(e) => set("filterValue", e.target.value)} /></div>
+          <div className="field mb"><label>Store Results As</label><input value={p.store_as || ""} onChange={(e) => set("store_as", e.target.value)} placeholder="e.g. openOpps" /></div>
+          <div className="field"><label>Next → go to</label><select value={edgeTo("next")} onChange={(e) => onConnect(node.id, e.target.value, "next")}><option value="">--</option>{others.map((n) => <option key={n.id} value={n.id}>{n.label || n.type}</option>)}</select></div>
+        </>
+      )}
+
+      {node.type === "loop" && (
+        <>
+          <div className="field mb"><label>Collection (from Get Records)</label><input value={p.collection || ""} onChange={(e) => set("collection", e.target.value)} placeholder="e.g. openOpps" /></div>
+          <AssignmentEditor fields={fields} value={p.assignments || []} onChange={(a) => set("assignments", a)} />
+          <div className="field mt"><label>After Loop → go to</label><select value={edgeTo("next")} onChange={(e) => onConnect(node.id, e.target.value, "next")}><option value="">--</option>{others.map((n) => <option key={n.id} value={n.id}>{n.label || n.type}</option>)}</select></div>
+        </>
+      )}
+
+      {node.type === "screen" && (
+        <>
+          <p className="muted mb" style={{ fontSize: "0.78rem" }}>Screen elements collect input in interactive (screen) flows. In record-triggered flows they're skipped.</p>
+          <div className="field"><label>Next → go to</label><select value={edgeTo("next")} onChange={(e) => onConnect(node.id, e.target.value, "next")}><option value="">--</option>{others.map((n) => <option key={n.id} value={n.id}>{n.label || n.type}</option>)}</select></div>
+        </>
+      )}
 
       {node.type === "decision" && (
         <>

@@ -72,11 +72,45 @@ async function runFlow(flow: SfFlow, record: { id: string; data: Record<string, 
   let current: FlowNode | undefined = start;
   let guard = 0;
   const working = { ...record.data };
+  const vars: Record<string, any[]> = {};
   let mutated = false;
 
-  while (current && guard++ < 50) {
+  while (current && guard++ < 100) {
     const node: FlowNode = current;
     switch (node.type) {
+      case "get_records": {
+        if (node.props.object_id) {
+          let q = supabase.from("sf_records").select("*").eq("object_id", node.props.object_id).limit(node.props.limit || 200);
+          const { data } = await q;
+          let rows = ((data as any[]) || []).map((r) => ({ Id: r.id, Name: r.name, ...r.data }));
+          if (node.props.filterField && node.props.filterValue !== undefined && node.props.filterValue !== "") {
+            rows = rows.filter((r) => String(r[node.props.filterField] ?? "") === String(node.props.filterValue));
+          }
+          vars[node.props.store_as || "records"] = rows;
+          log.push({ source: flow.label, node: node.label || "Get Records", message: `Retrieved ${rows.length} record(s) into ${node.props.store_as || "records"}` });
+        }
+        break;
+      }
+      case "loop": {
+        const coll = vars[node.props.collection] || [];
+        const assigns: { field: string; value: any }[] = node.props.assignments || [];
+        let count = 0;
+        for (const item of coll) {
+          if (assigns.length && item.Id) {
+            const newData: Record<string, any> = { ...item };
+            delete newData.Id; delete newData.Name;
+            for (const a of assigns) newData[a.field] = a.value;
+            await supabase.from("sf_records").update({ data: newData }).eq("id", item.Id);
+            count++;
+          }
+        }
+        log.push({ source: flow.label, node: node.label || "Loop", message: `Looped ${coll.length} item(s)${count ? `, updated ${count}` : ""}` });
+        break;
+      }
+      case "screen": {
+        log.push({ source: flow.label, node: node.label || "Screen", message: "Screen element (interactive — not shown in record-triggered runs)" });
+        break;
+      }
       case "assignment":
       case "update": {
         const assigns: { field: string; value: any }[] = node.props.assignments || [];

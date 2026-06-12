@@ -212,7 +212,7 @@ export interface SfUserAssignment {
 
 export interface FlowNode {
   id: string;
-  type: "start" | "decision" | "assignment" | "create" | "update" | "action" | "end";
+  type: "start" | "decision" | "assignment" | "create" | "update" | "action" | "end" | "get_records" | "loop" | "screen";
   label?: string;
   props: Record<string, any>;
   x: number;
