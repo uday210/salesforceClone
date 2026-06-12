@@ -112,3 +112,13 @@ export async function signOut() {
   clearUserCache();
   await supabase.auth.signOut();
 }
+
+// Resolve user ids -> display names (from sf_user_assignments.full_name).
+export async function getUserNames(ids: (string | null | undefined)[]): Promise<Record<string, string>> {
+  const unique = Array.from(new Set(ids.filter(Boolean) as string[]));
+  if (!unique.length) return {};
+  const { data } = await supabase.from("sf_user_assignments").select("user_id, full_name").in("user_id", unique);
+  const map: Record<string, string> = {};
+  for (const row of (data as any[]) || []) map[row.user_id] = row.full_name || "User";
+  return map;
+}

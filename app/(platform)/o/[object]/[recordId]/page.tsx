@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { getObjectByApi, getObjects, getFields, getPageLayouts, getLightningPages } from "@/lib/metadata";
 import { getRecord, getChildRecords, deleteRecord } from "@/lib/records";
-import { getObjectAccess, getFieldAccess } from "@/lib/session";
+import { getObjectAccess, getFieldAccess, getUserNames } from "@/lib/session";
 import { objectColor } from "@/lib/format";
 import { Icon } from "@/lib/icons";
 import { FieldDisplay } from "@/components/Fields";
@@ -29,6 +29,7 @@ export default function RecordDetailPage() {
   const [lightningPage, setLightningPage] = useState<SfLightningPage | null>(null);
   const [related, setRelated] = useState<RelatedDef[]>([]);
   const [access, setAccess] = useState({ read: false, create: false, edit: false, del: false });
+  const [userNames, setUserNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -43,6 +44,7 @@ export default function RecordDetailPage() {
       const lpages = await getLightningPages({ type: "record", objectId: o.id });
       setLightningPage(lpages.find((p) => p.is_default && p.active) || null);
       const fAccess = await getFieldAccess(o.id);
+      setUserNames(await getUserNames([rec?.created_by, rec?.last_modified_by]));
       setObject(o);
       setFields(f.filter((x) => !fAccess.hidden.has(x.id)));
       setRecord(rec);
@@ -199,10 +201,22 @@ export default function RecordDetailPage() {
 
         <div>
           <div className="card mb">
-            <div className="card-header"><Icon name="Eye" size={16} /><h3>Record Info</h3></div>
+            <div className="card-header"><Icon name="Eye" size={16} /><h3>System Information</h3></div>
             <div className="card-body">
-              <div className="field mb"><span className="field-display-label">Created</span><span className="field-display-value">{new Date(record.created_at).toLocaleString()}</span></div>
-              <div className="field"><span className="field-display-label">Last Modified</span><span className="field-display-value">{new Date(record.updated_at).toLocaleString()}</span></div>
+              <div className="field mb">
+                <span className="field-display-label">Created By</span>
+                <span className="field-display-value">
+                  {record.created_by ? (userNames[record.created_by] || "User") : "—"}
+                  <span className="muted">, {new Date(record.created_at).toLocaleString()}</span>
+                </span>
+              </div>
+              <div className="field">
+                <span className="field-display-label">Last Modified By</span>
+                <span className="field-display-value">
+                  {record.last_modified_by ? (userNames[record.last_modified_by] || "User") : "—"}
+                  <span className="muted">, {new Date(record.updated_at).toLocaleString()}</span>
+                </span>
+              </div>
             </div>
           </div>
         </div>

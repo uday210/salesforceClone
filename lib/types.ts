@@ -78,6 +78,7 @@ export interface SfRecord {
   name: string | null;
   data: Record<string, any>;
   created_by: string | null;
+  last_modified_by: string | null;
   created_at: string;
   updated_at: string;
 }
