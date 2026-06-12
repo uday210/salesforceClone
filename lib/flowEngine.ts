@@ -46,7 +46,11 @@ export async function runAutomation(
     const events = (trg.trigger_events || []).map((e) => e.toLowerCase());
     if (!events.some((e) => e.includes(event.split("_")[0]) || e === apexEvent)) continue;
     try {
-      runApexTrigger(trg, record, log);
+      const { runApex } = await import("./apexRuntime");
+      const res = await runApex(trg.body, { trigger: { newRecords: [record.data], event: apexEvent } });
+      res.logs.forEach((l) => log.push({ source: trg.name, message: l }));
+      // persist any in-place mutations the trigger made to record.data
+      await supabase.from("sf_records").update({ data: record.data }).eq("id", record.id);
     } catch (e: any) {
       log.push({ source: trg.name, message: `Apex error: ${e.message}` });
     }
@@ -124,14 +128,3 @@ async function runFlow(flow: SfFlow, record: { id: string; data: Record<string, 
   });
 }
 
-// Execute an apex-style trigger. The body is JS with access to a small API.
-function runApexTrigger(trg: SfApexClass, record: { id: string; data: Record<string, any> }, log: AutomationLogEntry[]) {
-  const api = {
-    record: record.data,
-    log: (msg: string) => log.push({ source: trg.name, message: String(msg) }),
-    System: { debug: (msg: any) => log.push({ source: trg.name, message: String(msg) }) },
-  };
-  // eslint-disable-next-line no-new-func
-  const fn = new Function("ctx", `"use strict"; const {record, log, System} = ctx; ${trg.body}`);
-  fn(api);
-}

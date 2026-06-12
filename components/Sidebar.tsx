@@ -27,6 +27,7 @@ const GROUPS: { title: string; items: { label: string; href: string; icon: strin
   {
     title: "Custom Code",
     items: [
+      { label: "Developer Console", href: "/setup/dev-console", icon: "Code2" },
       { label: "Apex Classes", href: "/setup/apex", icon: "Code2" },
       { label: "Lightning Components", href: "/setup/lwc", icon: "FileCode" },
       { label: "Visualforce Pages", href: "/setup/vf", icon: "FileCode" },

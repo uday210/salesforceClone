@@ -7,18 +7,21 @@ import { useToast } from "@/components/Toast";
 import type { SfApexClass, SfObject } from "@/lib/types";
 
 const TRIGGER_EVENTS = ["before insert", "after insert", "before update", "after update", "after delete"];
-const SAMPLE_CLASS = `// Apex-style class (runs as JavaScript in a sandbox)
-// Available: record (the record data), log(msg), System.debug(msg)
-function run() {
-  System.debug('Hello from Apex-style code');
-  return 1 + 1;
+const SAMPLE_CLASS = `// Apex-style class (JavaScript substitute). Available API:
+//   System.debug(...)      query('SELECT ... FROM ...')      insert(obj, data)   update(id, data)
+const opps = await query("SELECT Name, Amount, StageName FROM Opportunity WHERE Amount > 50000 ORDER BY Amount DESC");
+System.debug('Open large opps: ' + opps.length);
+for (const o of opps) {
+  System.debug(o.Name + ' = $' + o.Amount + ' (' + o.StageName + ')');
 }
-run();`;
+return opps.length;`;
 const SAMPLE_TRIGGER = `// Trigger body — runs on the configured events.
-// 'record' is the record's data object; use log() / System.debug().
-if (!record.Rating && record.AnnualRevenue > 1000000) {
-  record.Rating = 'Hot';
-  System.debug('Auto-rated as Hot');
+// Trigger.new / Trigger.old are arrays; Trigger.isInsert / isUpdate / isBefore / isAfter are booleans.
+for (const acc of Trigger.new) {
+  if (!acc.Rating && acc.AnnualRevenue > 1000000) {
+    acc.Rating = 'Hot';
+    System.debug('Auto-rated ' + (acc.Name || '') + ' as Hot');
+  }
 }`;
 
 export default function ApexPage() {
@@ -60,19 +63,12 @@ export default function ApexPage() {
     setSel(null); reload();
   }
 
-  function runAnonymous() {
+  async function runAnonymous() {
     if (!sel) return;
-    const logs: string[] = [];
-    try {
-      const api = { record: {}, log: (m: any) => logs.push(String(m)), System: { debug: (m: any) => logs.push(String(m)) } };
-      // eslint-disable-next-line no-new-func
-      const fn = new Function("ctx", `"use strict"; const {record, log, System} = ctx; ${sel.body}`);
-      const result = fn(api);
-      if (result !== undefined) logs.push(`=> ${JSON.stringify(result)}`);
-    } catch (e: any) {
-      logs.push(`Error: ${e.message}`);
-    }
-    setOutput(logs.length ? logs : ["(no output)"]);
+    setOutput(["Running…"]);
+    const { runApex } = await import("@/lib/apexRuntime");
+    const res = await runApex(sel.body);
+    setOutput(res.logs.length ? res.logs : ["(no output)"]);
   }
 
   return (

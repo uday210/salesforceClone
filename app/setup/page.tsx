@@ -7,6 +7,7 @@ const TOOLS = [
   { label: "App Manager", href: "/setup/apps", icon: "AppWindow", desc: "Build apps and assign tabs" },
   { label: "Lightning App Builder", href: "/setup/pages", icon: "Layers", desc: "Drag-and-drop record, app, and home pages" },
   { label: "Flows", href: "/setup/flows", icon: "Workflow", desc: "Automate processes with a visual flow builder" },
+  { label: "Developer Console", href: "/setup/dev-console", icon: "Code2", desc: "Run SOQL queries and execute anonymous code" },
   { label: "Apex Classes", href: "/setup/apex", icon: "Code2", desc: "Write classes and triggers" },
   { label: "Lightning Components", href: "/setup/lwc", icon: "FileCode", desc: "Author web components" },
   { label: "Visualforce Pages", href: "/setup/vf", icon: "FileCode", desc: "Author markup pages" },
