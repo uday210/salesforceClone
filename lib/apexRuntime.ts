@@ -18,18 +18,27 @@ function fmt(v: any): string {
 
 // Load all active classes (type='class') so their `class Foo { static … }` definitions
 // are in scope — this is what enables static methods + calling one class from another.
+function declaredName(body: string): string | null {
+  const stripped = String(body).replace(/^\s*(?:\/\/[^\n]*\n|\/\*[\s\S]*?\*\/\s*)*/, "");
+  const m = stripped.match(/^\s*(?:class\s+(\w+)|(?:const|let|var)\s+(\w+)\s*=\s*\{)/);
+  return m ? m[1] || m[2] : null;
+}
+
 async function loadLibrary(): Promise<string> {
   const { data } = await supabase.from("sf_apex_classes").select("name, body").eq("type", "class").eq("active", true);
-  // Only include classes that DECLARE a class/object (so calling Foo.method() works).
-  // Procedural "script" classes are excluded so they don't execute as a side effect.
-  return ((data as any[]) || [])
-    .filter((c) => {
-      // strip leading comments, then only include if it's a pure class/object declaration
-      const stripped = String(c.body).replace(/^\s*(?:\/\/[^\n]*\n|\/\*[\s\S]*?\*\/\s*)*/, "");
-      return /^\s*(?:class\s+\w+|(?:const|let|var)\s+\w+\s*=\s*\{)/.test(stripped);
-    })
-    .map((c) => `/* class ${c.name} */\n${c.body}`)
-    .join("\n\n");
+  const rows = ((data as any[]) || []).filter((c) => declaredName(c.body));
+  // Prefer rows whose class name matches the row name (avoids picking a copy-pasted sample),
+  // then dedupe by the declared identifier so we never declare the same class twice.
+  rows.sort((a, b) => (declaredName(a.body) === a.name ? 0 : 1) - (declaredName(b.body) === b.name ? 0 : 1));
+  const seen = new Set<string>();
+  const parts: string[] = [];
+  for (const c of rows) {
+    const id = declaredName(c.body)!;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    parts.push(`/* ${c.name} */\n${c.body}`);
+  }
+  return parts.join("\n\n");
 }
 
 // Runs Apex-style code (JavaScript) with a Salesforce-flavored API surface.
@@ -105,16 +114,30 @@ export async function runApex(
     record: ctx?.trigger?.newRecords?.[0] || {},
   };
 
+  const wrap = (pre: string) =>
+    `return (async () => { "use strict";
+      const {System, query, Trigger, Database, insert, update, record} = ctx;
+      ${pre}
+      ${body}
+    })()`;
+
+  // Build the function; if the shared library fails to parse (e.g. duplicate class
+  // from copy-pasted samples), retry WITHOUT it so the body still runs.
+  let fn: Function;
   try {
     // eslint-disable-next-line no-new-func
-    const fn = new Function(
-      "ctx",
-      `return (async () => { "use strict";
-        const {System, query, Trigger, Database, insert, update, record} = ctx;
-        ${preamble}
-        ${body}
-      })()`
-    );
+    fn = new Function("ctx", wrap(preamble));
+  } catch {
+    try {
+      // eslint-disable-next-line no-new-func
+      fn = new Function("ctx", wrap(""));
+    } catch (e2: any) {
+      logs.push("FATAL|" + e2.message);
+      return { logs, error: e2.message };
+    }
+  }
+
+  try {
     const result = await fn(api);
     if (result !== undefined) logs.push("RESULT|" + fmt(result));
     return { logs, result };

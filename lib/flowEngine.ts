@@ -34,7 +34,11 @@ export async function runAutomation(
   }
 
   // ---- Apex-style triggers ----
-  const apexEvent = event.replace("_", " "); // after_create -> "after create" (we match loosely)
+  // Map the app event (create/update/delete) to the Salesforce DML operation (insert/update/delete)
+  // so a trigger registered for "before insert" fires when a record is created, etc.
+  const op = event.includes("create") ? "insert" : event.includes("update") ? "update" : event.includes("delete") ? "delete" : event;
+  const timing = event.includes("before") ? "before" : "after";
+  const apexEvent = `${timing} ${op}`; // e.g. "after insert"
   const { data: triggers } = await supabase
     .from("sf_apex_classes")
     .select("*")
@@ -44,7 +48,8 @@ export async function runAutomation(
 
   for (const trg of (triggers as SfApexClass[]) || []) {
     const events = (trg.trigger_events || []).map((e) => e.toLowerCase());
-    if (!events.some((e) => e.includes(event.split("_")[0]) || e === apexEvent)) continue;
+    // match on the operation keyword (insert/update/delete) — timing (before/after) is informational here
+    if (!events.some((e) => e.includes(op))) continue;
     try {
       const { runApex, saveDebugLog } = await import("./apexRuntime");
       const res = await runApex(trg.body, { trigger: { newRecords: [record.data], event: apexEvent } });
