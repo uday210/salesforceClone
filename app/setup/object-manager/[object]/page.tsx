@@ -2,13 +2,14 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import { getObjectByApi, getObjects, getFields, getValidationRules, getRecordTypes } from "@/lib/metadata";
+import Link from "next/link";
+import { getObjectByApi, getObjects, getFields, getValidationRules, getRecordTypes, getPageLayouts } from "@/lib/metadata";
 import { fieldTypeIcon, Icon } from "@/lib/icons";
 import { apiNameFromLabel } from "@/lib/format";
 import { describeCondition } from "@/lib/validation";
 import Modal from "@/components/Modal";
 import { useToast } from "@/components/Toast";
-import type { SfObject, SfField, SfValidationRule, SfRecordType, FieldType } from "@/lib/types";
+import type { SfObject, SfField, SfValidationRule, SfRecordType, SfPageLayout, FieldType } from "@/lib/types";
 
 const FIELD_TYPES: FieldType[] = ["text", "textarea", "number", "currency", "percent", "checkbox", "date", "datetime", "email", "phone", "url", "picklist", "lookup", "formula"];
 const OPS = ["eq", "ne", "lt", "lte", "gt", "gte", "contains", "blank", "notblank", "in"];
@@ -21,7 +22,8 @@ export default function ObjectDetailPage() {
   const [fields, setFields] = useState<SfField[]>([]);
   const [rules, setRules] = useState<SfValidationRule[]>([]);
   const [recordTypes, setRecordTypes] = useState<SfRecordType[]>([]);
-  const [tab, setTab] = useState<"fields" | "rules" | "recordtypes">("fields");
+  const [layouts, setLayouts] = useState<SfPageLayout[]>([]);
+  const [tab, setTab] = useState<"fields" | "rules" | "recordtypes" | "layouts">("fields");
   const [showField, setShowField] = useState(false);
   const [showRule, setShowRule] = useState(false);
   const [showRT, setShowRT] = useState(false);
@@ -34,6 +36,21 @@ export default function ObjectDetailPage() {
     setFields(await getFields(o.id));
     setRules(await getValidationRules(o.id));
     setRecordTypes(await getRecordTypes(o.id));
+    setLayouts(await getPageLayouts(o.id));
+  }
+
+  async function createLayout() {
+    if (!object) return;
+    const { supabase } = await import("@/lib/supabaseClient");
+    const allFields = await getFields(object.id);
+    const { data } = await supabase.from("sf_page_layouts").insert({
+      object_id: object.id,
+      name: `${object.label} Layout`,
+      sections: [{ title: "Information", columns: 2, fields: allFields.map((f) => f.api_name) }],
+      related_lists: [],
+      is_default: layouts.length === 0,
+    }).select().single();
+    if (data) window.location.href = `/setup/object-manager/${api}/layout/${data.id}`;
   }
   useEffect(() => { reload(); }, [api]);
 
@@ -52,6 +69,7 @@ export default function ObjectDetailPage() {
       <div className="nav-bar" style={{ boxShadow: "none", borderRadius: "var(--radius) var(--radius) 0 0" }}>
         <a className={`nav-tab ${tab === "fields" ? "active" : ""}`} onClick={() => setTab("fields")} style={{ cursor: "pointer" }}>Fields & Relationships ({fields.length})</a>
         <a className={`nav-tab ${tab === "rules" ? "active" : ""}`} onClick={() => setTab("rules")} style={{ cursor: "pointer" }}>Validation Rules ({rules.length})</a>
+        <a className={`nav-tab ${tab === "layouts" ? "active" : ""}`} onClick={() => setTab("layouts")} style={{ cursor: "pointer" }}>Page Layouts ({layouts.length})</a>
         {object.enable_record_types && <a className={`nav-tab ${tab === "recordtypes" ? "active" : ""}`} onClick={() => setTab("recordtypes")} style={{ cursor: "pointer" }}>Record Types ({recordTypes.length})</a>}
       </div>
 
@@ -98,6 +116,30 @@ export default function ObjectDetailPage() {
                       </tr>
                     ))}
                     {!rules.length && <tr><td colSpan={4} className="muted">No validation rules.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          {tab === "layouts" && (
+            <>
+              <div className="flex mb" style={{ justifyContent: "flex-end" }}>
+                <button className="btn btn-brand btn-sm" onClick={createLayout}><Icon name="Plus" size={12} /> New Page Layout</button>
+              </div>
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead><tr><th>Layout Name</th><th>Sections</th><th>Related Lists</th><th>Default</th></tr></thead>
+                  <tbody>
+                    {layouts.map((l) => (
+                      <tr key={l.id}>
+                        <td><Link href={`/setup/object-manager/${api}/layout/${l.id}`}><Icon name="Columns" size={13} /> {l.name}</Link></td>
+                        <td>{l.sections?.length || 0}</td>
+                        <td>{l.related_lists?.length || 0}</td>
+                        <td>{l.is_default ? "✓" : ""}</td>
+                      </tr>
+                    ))}
+                    {!layouts.length && <tr><td colSpan={4} className="muted">No page layouts. Create one to control how the record detail page looks.</td></tr>}
                   </tbody>
                 </table>
               </div>
