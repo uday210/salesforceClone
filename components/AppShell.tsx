@@ -73,11 +73,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <div style={{ ["--app-color" as any]: currentApp?.color || "#0176d3" }}>
       <header className="global-header">
         <button className="app-launcher" onClick={() => setLauncher(true)} title="App Launcher">
-          <Icon name="Grid3x3" size={18} />
+          <Icon name="Grid3x3" size={20} />
         </button>
-        <Link href="/home" className="app-name" style={{ color: "var(--sf-text)" }}>
-          {currentApp?.label || "Salesforce"}
-        </Link>
         <form className="global-search" onSubmit={submitSearch}>
           <Icon name="Search" size={16} />
           <input
@@ -107,16 +104,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       <nav className="nav-bar">
+        <Link href="/home" className="nav-app" style={{ color: "inherit" }}>
+          <span className="nav-app-icon" style={{ background: currentApp?.color || "var(--brand)" }}>
+            <Icon name={currentApp?.icon || "Briefcase"} size={18} />
+          </span>
+          {currentApp?.label || "Salesforce"}
+        </Link>
         <Link href="/home" className={`nav-tab ${pathname === "/home" ? "active" : ""}`}>
-          <Icon name="Home" size={15} /> Home
+          Home
         </Link>
         {navTabs.map((t) => (
           <Link key={t.id} href={tabHref(t)} className={`nav-tab ${isActive(t) ? "active" : ""}`}>
-            <Icon name={t.icon} size={15} /> {t.label}
+            {t.label}
           </Link>
         ))}
         <Link href="/reports" className={`nav-tab ${pathname.startsWith("/reports") ? "active" : ""}`}>
-          <Icon name="TrendingUp" size={15} /> Reports
+          Reports
         </Link>
       </nav>
 
