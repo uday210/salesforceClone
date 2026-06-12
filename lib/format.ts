@@ -42,3 +42,20 @@ export function deriveRecordName(objectApi: string, data: Record<string, any>): 
 export function apiNameFromLabel(label: string): string {
   return label.trim().replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "Custom";
 }
+
+// Salesforce-style per-object icon tile colors.
+const OBJECT_COLORS: Record<string, string> = {
+  Account: "#7f5fc9",
+  Contact: "#5867e8",
+  Lead: "#f2974a",
+  Opportunity: "#fcb95b",
+  Task: "#3ba755",
+};
+const PALETTE = ["#5867e8", "#7f5fc9", "#00a1e0", "#3ba755", "#f2974a", "#e9696e", "#16a5a5", "#d4504c"];
+
+export function objectColor(apiName: string): string {
+  if (OBJECT_COLORS[apiName]) return OBJECT_COLORS[apiName];
+  let h = 0;
+  for (let i = 0; i < apiName.length; i++) h = (h * 31 + apiName.charCodeAt(i)) >>> 0;
+  return PALETTE[h % PALETTE.length];
+}

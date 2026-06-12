@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { getObjectByApi, getFields, getListViews } from "@/lib/metadata";
 import { listRecords } from "@/lib/records";
 import { getObjectAccess } from "@/lib/session";
+import { objectColor } from "@/lib/format";
 import { Icon } from "@/lib/icons";
 import DataTable from "@/components/DataTable";
 import KanbanBoard from "@/components/KanbanBoard";
@@ -49,7 +50,7 @@ export default function ListPage() {
   return (
     <div className="page">
       <div className="record-header">
-        <span className="record-icon" style={{ background: "var(--sf-blue)" }}><Icon name={object.icon} size={20} /></span>
+        <span className="record-icon" style={{ background: objectColor(object.api_name) }}><Icon name={object.icon} size={20} /></span>
         <div>
           <div className="eyebrow">{object.label}</div>
           <h1>{object.plural_label}</h1>

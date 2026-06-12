@@ -4,6 +4,7 @@ import Link from "next/link";
 import { getObjects, getObjectByApi } from "@/lib/metadata";
 import { listRecords } from "@/lib/records";
 import { getCurrentUser } from "@/lib/session";
+import { objectColor } from "@/lib/format";
 import { Icon } from "@/lib/icons";
 import { BarChart, DonutChart } from "@/components/Charts";
 import type { SfRecord } from "@/lib/types";
@@ -80,8 +81,8 @@ export default function HomePage() {
 
       <div className="stat-grid mb">
         {counts.map((c) => (
-          <Link key={c.api} href={`/o/${c.api}`} className="stat-card" style={{ display: "block", color: "inherit" }}>
-            <span className="icon"><Icon name={c.icon} size={32} /></span>
+          <Link key={c.api} href={`/o/${c.api}`} className="stat-card" style={{ display: "block", color: "inherit", ["--accent" as any]: objectColor(c.api) }}>
+            <span className="stat-tile-icon" style={{ background: objectColor(c.api) }}><Icon name={c.icon} size={20} /></span>
             <div className="label">{c.label}</div>
             <div className="value">{c.count}</div>
           </Link>

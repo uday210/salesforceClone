@@ -70,7 +70,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div>
+    <div style={{ ["--app-color" as any]: currentApp?.color || "#0176d3" }}>
       <header className="global-header">
         <button className="app-launcher" onClick={() => setLauncher(true)} title="App Launcher">
           <Icon name="Grid3x3" size={18} />

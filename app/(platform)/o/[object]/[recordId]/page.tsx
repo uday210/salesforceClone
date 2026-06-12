@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { getObjectByApi, getObjects, getFields, getPageLayouts } from "@/lib/metadata";
 import { getRecord, getChildRecords, deleteRecord } from "@/lib/records";
 import { getObjectAccess } from "@/lib/session";
+import { objectColor } from "@/lib/format";
 import { Icon } from "@/lib/icons";
 import { FieldDisplay } from "@/components/Fields";
 import { useToast } from "@/components/Toast";
@@ -78,7 +79,7 @@ export default function RecordDetailPage() {
     <div className="page">
       <div className="record-header">
         <button className="btn-icon" onClick={() => router.push(`/o/${api}`)}><Icon name="ArrowLeft" /></button>
-        <span className="record-icon" style={{ background: "var(--sf-blue)" }}><Icon name={object.icon} size={20} /></span>
+        <span className="record-icon" style={{ background: objectColor(object.api_name) }}><Icon name={object.icon} size={20} /></span>
         <div>
           <div className="eyebrow">{object.label}</div>
           <h1>{record.name || "Untitled"}</h1>
