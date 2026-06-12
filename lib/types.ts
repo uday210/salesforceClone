@@ -268,6 +268,24 @@ export interface SfCustomLabel {
   language: string;
 }
 
+export interface SfReport {
+  id: string;
+  name: string;
+  object_id: string | null;
+  group_field: string | null;
+  measure: "count" | "sum";
+  measure_field: string | null;
+  filters: { field: string; op: string; value: string }[];
+  chart: "bar" | "donut" | "table";
+}
+
+export interface DashboardWidget { id: string; report_id: string; title: string; size: "half" | "full"; }
+export interface SfDashboard {
+  id: string;
+  name: string;
+  widgets: DashboardWidget[];
+}
+
 export interface SfCustomSetting {
   id: string;
   api_name: string;

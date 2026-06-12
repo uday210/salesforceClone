@@ -123,6 +123,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <Link href="/reports" className={`nav-tab ${pathname.startsWith("/reports") ? "active" : ""}`}>
           Reports
         </Link>
+        <Link href="/dashboards" className={`nav-tab ${pathname.startsWith("/dashboards") ? "active" : ""}`}>
+          Dashboards
+        </Link>
       </nav>
 
       <main>{children}</main>

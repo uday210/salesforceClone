@@ -1,66 +1,67 @@
 "use client";
 import { useEffect, useState } from "react";
-import { getObjects, getFields } from "@/lib/metadata";
-import { listRecords } from "@/lib/records";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
+import { getObjects } from "@/lib/metadata";
 import { Icon } from "@/lib/icons";
-import { BarChart, DonutChart } from "@/components/Charts";
-import type { SfObject, SfField } from "@/lib/types";
+import { useToast } from "@/components/Toast";
+import type { SfReport, SfObject } from "@/lib/types";
 
 export default function ReportsPage() {
+  const [reports, setReports] = useState<SfReport[]>([]);
   const [objects, setObjects] = useState<SfObject[]>([]);
-  const [objectId, setObjectId] = useState("");
-  const [fields, setFields] = useState<SfField[]>([]);
-  const [groupField, setGroupField] = useState("");
-  const [measure, setMeasure] = useState<"count" | "amount">("count");
-  const [chart, setChart] = useState<"bar" | "donut">("bar");
-  const [data, setData] = useState<{ label: string; value: number }[]>([]);
+  const router = useRouter();
+  const toast = useToast();
 
-  useEffect(() => { getObjects().then((o) => { setObjects(o); const opp = o.find((x) => x.api_name === "Opportunity"); if (opp) setObjectId(opp.id); }); }, []);
+  async function reload() {
+    const { data } = await supabase.from("sf_reports").select("*").order("name");
+    setReports((data as SfReport[]) || []);
+    setObjects(await getObjects());
+  }
+  useEffect(() => { reload(); }, []);
 
-  useEffect(() => {
-    if (!objectId) return;
-    (async () => {
-      const f = await getFields(objectId);
-      setFields(f);
-      const pick = f.find((x) => x.api_name === "StageName") || f.find((x) => x.type === "picklist") || f[0];
-      setGroupField((g) => g || pick?.api_name || "");
-    })();
-  }, [objectId]);
+  async function create() {
+    const opp = objects.find((o) => o.api_name === "Opportunity") || objects[0];
+    const { data } = await supabase.from("sf_reports").insert({
+      name: "New Report", object_id: opp?.id || null, group_field: "StageName", measure: "count", chart: "bar", filters: [],
+    }).select().single();
+    router.push(`/reports/${data.id}`);
+  }
 
-  useEffect(() => {
-    if (!objectId || !groupField) return;
-    (async () => {
-      const recs = await listRecords(objectId, { limit: 1000 });
-      const agg: Record<string, number> = {};
-      recs.forEach((r) => {
-        const k = r.data[groupField] ?? "None";
-        agg[k] = (agg[k] || 0) + (measure === "amount" ? Number(r.data.Amount) || 0 : 1);
-      });
-      setData(Object.entries(agg).map(([label, value]) => ({ label: String(label), value: Math.round(value) })));
-    })();
-  }, [objectId, groupField, measure]);
+  async function del(id: string) {
+    if (!confirm("Delete this report?")) return;
+    await supabase.from("sf_reports").delete().eq("id", id);
+    toast("Report deleted", "success");
+    reload();
+  }
 
   return (
     <div className="page">
       <div className="record-header">
-        <span className="record-icon" style={{ background: "var(--sf-blue)" }}><Icon name="TrendingUp" size={20} /></span>
-        <div><div className="eyebrow">Reports</div><h1>Report Builder</h1></div>
-      </div>
-      <div className="card mb">
-        <div className="card-body">
-          <div className="form-grid">
-            <div className="field"><label>Object</label><select value={objectId} onChange={(e) => { setObjectId(e.target.value); setGroupField(""); }}>{objects.map((o) => <option key={o.id} value={o.id}>{o.plural_label}</option>)}</select></div>
-            <div className="field"><label>Group By</label><select value={groupField} onChange={(e) => setGroupField(e.target.value)}>{fields.map((f) => <option key={f.id} value={f.api_name}>{f.label}</option>)}</select></div>
-            <div className="field"><label>Measure</label><select value={measure} onChange={(e) => setMeasure(e.target.value as any)}><option value="count">Record Count</option><option value="amount">Sum of Amount</option></select></div>
-            <div className="field"><label>Chart</label><select value={chart} onChange={(e) => setChart(e.target.value as any)}><option value="bar">Bar</option><option value="donut">Donut</option></select></div>
-          </div>
+        <span className="record-icon" style={{ background: "#e9696e" }}><Icon name="TrendingUp" size={20} /></span>
+        <div><div className="eyebrow">Analytics</div><h1>Reports</h1></div>
+        <div className="header-actions">
+          <Link href="/dashboards" className="btn"><Icon name="Layout" size={14} /> Dashboards</Link>
+          <button className="btn btn-brand" onClick={create}><Icon name="Plus" size={14} /> New Report</button>
         </div>
       </div>
-      <div className="card">
-        <div className="card-header"><Icon name="TrendingUp" size={16} /><h3>Result</h3></div>
-        <div className="card-body">
-          {data.length ? (chart === "donut" ? <DonutChart data={data} size={240} /> : <BarChart data={data} height={300} />) : <div className="empty-state">No data</div>}
-        </div>
+      <div className="table-wrap">
+        <table className="data-table">
+          <thead><tr><th>Report Name</th><th>Object</th><th>Grouped By</th><th>Measure</th><th></th></tr></thead>
+          <tbody>
+            {reports.map((r) => (
+              <tr key={r.id}>
+                <td><Link href={`/reports/${r.id}`}><Icon name="TrendingUp" size={13} /> {r.name}</Link></td>
+                <td className="muted">{objects.find((o) => o.id === r.object_id)?.label || "—"}</td>
+                <td>{r.group_field || "—"}</td>
+                <td>{r.measure === "sum" ? `Sum of ${r.measure_field || "Amount"}` : "Record Count"}</td>
+                <td><button className="btn-icon btn-sm" onClick={() => del(r.id)}><Icon name="Trash2" size={12} /></button></td>
+              </tr>
+            ))}
+            {!reports.length && <tr><td colSpan={5} className="muted">No reports yet. Create one to analyze your data.</td></tr>}
+          </tbody>
+        </table>
       </div>
     </div>
   );
