@@ -8,6 +8,7 @@ import { getObjectAccess, getFieldAccess } from "@/lib/session";
 import { objectColor } from "@/lib/format";
 import { Icon } from "@/lib/icons";
 import { FieldDisplay } from "@/components/Fields";
+import FilesRelatedList from "@/components/FilesRelatedList";
 import { ComponentRenderer, RecordProvider } from "@/components/LightningRenderer";
 import { useToast } from "@/components/Toast";
 import type { SfObject, SfField, SfRecord, SfPageLayout, SfLightningPage } from "@/lib/types";
@@ -192,6 +193,8 @@ export default function RecordDetailPage() {
               </div>
             </div>
           ))}
+
+          <FilesRelatedList recordId={record.id} objectId={object.id} />
         </div>
 
         <div>
