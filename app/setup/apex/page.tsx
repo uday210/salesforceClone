@@ -35,26 +35,42 @@ for (const acc of Trigger.new) {
     System.debug('Auto-rated ' + (acc.Name || '') + ' as Hot');
   }
 }`;
+const SAMPLE_REST = `// @RestResource — external systems call /api/apex/rest/<ClassName>
+// Available: query(object), insert(object, name, data), System.debug
+async function doGet(req) {
+  const accounts = await query('Account');
+  return { records: accounts, totalSize: accounts.length };
+}
+async function doPost(req) {
+  const body = req.body || {};
+  if (!body.Name) return { status: 400, error: 'Name is required' };
+  const id = await insert('Account', body.Name, body);
+  return { status: 201, id };
+}`;
 
 export default function ApexPage() {
   const [classes, setClasses] = useState<SfApexClass[]>([]);
   const [objects, setObjects] = useState<SfObject[]>([]);
   const [sel, setSel] = useState<SfApexClass | null>(null);
   const [output, setOutput] = useState<string[]>([]);
+  const [apiKey, setApiKey] = useState<string>("");
   const toast = useToast();
 
   async function reload() {
     const { data } = await supabase.from("sf_apex_classes").select("*").order("name");
     setClasses((data as SfApexClass[]) || []);
     setObjects(await getObjects());
+    const { data: keys } = await supabase.from("sf_api_keys").select("key").eq("active", true).limit(1);
+    setApiKey((keys as any[])?.[0]?.key || "");
   }
   useEffect(() => { reload(); }, []);
 
-  async function create(type: "class" | "trigger", body?: string) {
-    const name = prompt(`New ${type === "trigger" ? "trigger" : "class"} name:`);
+  async function create(type: "class" | "trigger" | "rest", body?: string) {
+    const name = prompt(`New ${type} name:`);
     if (!name) return;
+    const defaults: Record<string, string> = { class: SAMPLE_CLASS, trigger: SAMPLE_TRIGGER, rest: SAMPLE_REST };
     const { data } = await supabase.from("sf_apex_classes").insert({
-      name, type, body: body || (type === "class" ? SAMPLE_CLASS : SAMPLE_TRIGGER), trigger_events: [], active: true,
+      name, type, body: body || defaults[type], trigger_events: [], active: true,
     }).select().single();
     await reload();
     setSel(data as SfApexClass);
@@ -91,6 +107,7 @@ export default function ApexPage() {
           <button className="btn" onClick={() => create("class")}><Icon name="Plus" size={14} /> New Class</button>
           <button className="btn" onClick={() => create("trigger")}><Icon name="Plus" size={14} /> New Trigger</button>
           <button className="btn" onClick={() => create("class", SAMPLE_BATCH)}><Icon name="Plus" size={14} /> New Batch</button>
+          <button className="btn" onClick={() => create("rest")}><Icon name="Plus" size={14} /> New REST</button>
         </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: "0.75rem", alignItems: "start" }}>
@@ -108,7 +125,7 @@ export default function ApexPage() {
         {sel ? (
           <div className="card">
             <div className="card-header">
-              <Icon name="Code2" size={16} /><h3>{sel.name}.{sel.type === "trigger" ? "trigger" : "cls"}</h3>
+              <Icon name="Code2" size={16} /><h3>{sel.name}.{sel.type === "trigger" ? "trigger" : sel.type === "rest" ? "apexrest" : "cls"}</h3>
               <div className="ml-auto flex gap">
                 {sel.type === "class" && <button className="btn btn-sm" onClick={runAnonymous}><Icon name="Play" size={12} /> Run</button>}
                 <button className="btn btn-sm btn-danger" onClick={del}><Icon name="Trash2" size={12} /></button>
@@ -132,6 +149,23 @@ export default function ApexPage() {
                         </label>
                       ))}
                     </div>
+                  </div>
+                </div>
+              )}
+              {sel.type === "rest" && (
+                <div className="card mb" style={{ background: "#f3f9fe", borderColor: "var(--brand-accent)" }}>
+                  <div className="card-body" style={{ fontSize: "0.8rem" }}>
+                    <strong><Icon name="Globe" size={13} /> REST Endpoint</strong>
+                    <div className="mt" style={{ fontFamily: "monospace" }}>{typeof window !== "undefined" ? window.location.origin : ""}/api/apex/rest/{sel.name}</div>
+                    <div className="mt"><strong>API Key</strong> (send as <code>x-api-key</code> header):</div>
+                    <div style={{ fontFamily: "monospace", wordBreak: "break-all" }}>{apiKey || "—"}</div>
+                    <div className="mt"><strong>Try it (GET):</strong></div>
+                    <pre style={{ background: "#1e1e2e", color: "#cdd6f4", padding: "0.6rem", borderRadius: "var(--radius)", overflow: "auto", fontSize: "0.72rem" }}>{`curl ${typeof window !== "undefined" ? window.location.origin : ""}/api/apex/rest/${sel.name} \\
+  -H "x-api-key: ${apiKey}"`}</pre>
+                    <div><strong>Create (POST):</strong></div>
+                    <pre style={{ background: "#1e1e2e", color: "#cdd6f4", padding: "0.6rem", borderRadius: "var(--radius)", overflow: "auto", fontSize: "0.72rem" }}>{`curl -X POST ${typeof window !== "undefined" ? window.location.origin : ""}/api/apex/rest/${sel.name} \\
+  -H "x-api-key: ${apiKey}" -H "Content-Type: application/json" \\
+  -d '{"Name":"New Co","Industry":"Technology"}'`}</pre>
                   </div>
                 </div>
               )}

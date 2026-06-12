@@ -234,7 +234,7 @@ export interface SfFlow {
 export interface SfApexClass {
   id: string;
   name: string;
-  type: "class" | "trigger";
+  type: "class" | "trigger" | "rest";
   body: string;
   trigger_object_id: string | null;
   trigger_events: string[];
