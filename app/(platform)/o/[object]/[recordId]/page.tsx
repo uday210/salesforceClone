@@ -2,14 +2,15 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { getObjectByApi, getObjects, getFields, getPageLayouts } from "@/lib/metadata";
+import { getObjectByApi, getObjects, getFields, getPageLayouts, getLightningPages } from "@/lib/metadata";
 import { getRecord, getChildRecords, deleteRecord } from "@/lib/records";
 import { getObjectAccess } from "@/lib/session";
 import { objectColor } from "@/lib/format";
 import { Icon } from "@/lib/icons";
 import { FieldDisplay } from "@/components/Fields";
+import { ComponentRenderer, RecordProvider } from "@/components/LightningRenderer";
 import { useToast } from "@/components/Toast";
-import type { SfObject, SfField, SfRecord, SfPageLayout } from "@/lib/types";
+import type { SfObject, SfField, SfRecord, SfPageLayout, SfLightningPage } from "@/lib/types";
 
 interface RelatedDef { object: SfObject; field: SfField; records: SfRecord[]; }
 
@@ -24,6 +25,7 @@ export default function RecordDetailPage() {
   const [fields, setFields] = useState<SfField[]>([]);
   const [record, setRecord] = useState<SfRecord | null>(null);
   const [layout, setLayout] = useState<SfPageLayout | null>(null);
+  const [lightningPage, setLightningPage] = useState<SfLightningPage | null>(null);
   const [related, setRelated] = useState<RelatedDef[]>([]);
   const [access, setAccess] = useState({ read: false, create: false, edit: false, del: false });
   const [loading, setLoading] = useState(true);
@@ -37,6 +39,8 @@ export default function RecordDetailPage() {
         getFields(o.id), getRecord(recordId), getPageLayouts(o.id), getObjectAccess(o.id), getObjects(),
       ]);
       const defLayout = layouts.find((l) => l.is_default) || layouts[0] || null;
+      const lpages = await getLightningPages({ type: "record", objectId: o.id });
+      setLightningPage(lpages.find((p) => p.is_default && p.active) || null);
       setObject(o);
       setFields(f);
       setRecord(rec);
@@ -117,6 +121,14 @@ export default function RecordDetailPage() {
         </div>
       )}
 
+      {lightningPage ? (
+        <RecordProvider value={{ object, fields, record, related: related.map((r) => ({ object: r.object, records: r.records })) }}>
+          <div style={{ display: "grid", gridTemplateColumns: lightningPage.regions.sidebar?.length ? "2fr 1fr" : "1fr", gap: "0.75rem", alignItems: "start" }}>
+            <div>{(lightningPage.regions.main || []).map((c) => <ComponentRenderer key={c.id} comp={c} />)}</div>
+            {lightningPage.regions.sidebar?.length > 0 && <div>{lightningPage.regions.sidebar.map((c) => <ComponentRenderer key={c.id} comp={c} />)}</div>}
+          </div>
+        </RecordProvider>
+      ) : (
       <div className="record-grid">
         <div>
           <div className="card mb">
@@ -191,6 +203,7 @@ export default function RecordDetailPage() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

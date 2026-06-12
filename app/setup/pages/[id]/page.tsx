@@ -19,6 +19,18 @@ export default function PageBuilder() {
   const [selected, setSelected] = useState<{ region: RegionKey; id: string } | null>(null);
   const [dragType, setDragType] = useState<string | null>(null);
   const [over, setOver] = useState<RegionKey | null>(null);
+  const [preview, setPreview] = useState(false);
+  const [isDefault, setIsDefault] = useState(false);
+
+  async function activate() {
+    if (!page) return;
+    if (page.type === "record" && page.object_id) {
+      await supabase.from("sf_lightning_pages").update({ is_default: false }).eq("type", "record").eq("object_id", page.object_id).neq("id", id);
+    }
+    await supabase.from("sf_lightning_pages").update({ is_default: true, active: true, regions }).eq("id", id);
+    setIsDefault(true);
+    toast(page.type === "record" ? "Activated as the org default record page" : "Activated", "success");
+  }
 
   useEffect(() => {
     (async () => {
@@ -26,6 +38,7 @@ export default function PageBuilder() {
       const p = data as SfLightningPage;
       setPage(p);
       setRegions(p.regions || { main: [], sidebar: [] });
+      setIsDefault(p.is_default);
       setObjects(await getObjects());
     })();
   }, [id]);
@@ -60,11 +73,18 @@ export default function PageBuilder() {
     <div>
       <div className="flex items-center gap mb">
         <span className="record-icon" style={{ background: "var(--sf-blue)" }}><Icon name="Layers" size={18} /></span>
-        <div><div className="eyebrow muted">{page.type} page</div><h1>{page.name}</h1></div>
-        <a href={page.type === "record" ? "#" : `/page/${page.id}`} target="_blank" className="btn ml-auto" style={page.type === "record" ? { pointerEvents: "none", opacity: 0.5 } : {}}><Icon name="Eye" size={14} /> Preview</a>
+        <div><div className="eyebrow muted">{page.type} page {isDefault && <span className="badge" style={{ color: "var(--sf-green)" }}>Active</span>}</div><h1>{page.name}</h1></div>
+        <button className={`btn ml-auto ${preview ? "btn-brand" : ""}`} onClick={() => setPreview((p) => !p)}><Icon name="Eye" size={14} /> {preview ? "Editing off" : "Preview"}</button>
+        <button className="btn" onClick={activate}><Icon name="Check" size={14} /> Activate</button>
         <button className="btn btn-brand" onClick={save}><Icon name="Save" size={14} /> Save</button>
       </div>
 
+      {preview ? (
+        <div style={{ display: "grid", gridTemplateColumns: regions.sidebar.length ? "2fr 1fr" : "1fr", gap: "0.75rem", alignItems: "start", background: "#f3f3f3", padding: "1rem", borderRadius: "0.5rem" }}>
+          <div>{regions.main.map((c) => <ComponentRenderer key={c.id} comp={c} />)}</div>
+          {regions.sidebar.length > 0 && <div>{regions.sidebar.map((c) => <ComponentRenderer key={c.id} comp={c} />)}</div>}
+        </div>
+      ) : (
       <div style={{ display: "grid", gridTemplateColumns: "200px 1fr 260px", gap: "0.75rem", alignItems: "start" }}>
         {/* Palette */}
         <div className="card">
@@ -122,6 +142,7 @@ export default function PageBuilder() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }
